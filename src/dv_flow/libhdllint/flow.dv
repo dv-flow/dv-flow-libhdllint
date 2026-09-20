@@ -1,0 +1,419 @@
+# yaml-language-server: $schema=https://dv-flow.github.io/flow.dv.schema.json
+#****************************************************************************
+#* flow.dv
+#*
+#* Copyright 2025 Matthew Ballance and Contributors
+#*
+#* Licensed under the Apache License, Version 2.0 (the "License"); you may
+#* not use this file except in compliance with the License.
+#* You may obtain a copy of the License at:
+#*
+#*   http://www.apache.org/licenses/LICENSE-2.0
+#*
+#* Unless required by applicable law or agreed to in writing, software
+#* distributed under the License is distributed on an "AS IS" BASIS,
+#* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#* See the License for the specific language governing permissions and
+#* limitations under the License.
+#*
+#****************************************************************************
+
+package:
+  name: hdllint
+  desc: HDL lint package -- runs lint tools and reports normalized findings
+  doc: |
+    `hdllint` runs one or more HDL lint tools over a set of sources and
+    produces a single normalized report: dv-flow markers, `lint.json`,
+    SARIF (for code-scanning annotations) and CTRF (for the CI test report).
+
+    **How this differs from `hdlsim`.** `hdlsim` selects exactly one
+    simulator, and `hdlsim.sim` is a scalar. `hdllint` does not: lint is
+    normally run with several tools at once, because what each tool sees
+    barely overlaps with what the others see. So the family tasks take
+    `tools:` -- a *list* -- and merge the results. An empty list means
+    "every registered tool that implements this family and is installed",
+    which is what makes `uses: hdllint.Rtl` work with no configuration.
+
+    A named tool that is not installed is an error; an auto-selected tool
+    that is not installed is a skip, reported as an Info marker. A report is
+    never quietly thin.
+
+    Three families, split by what the rules are about rather than by tool:
+
+    * `Rtl`   -- design lint: width, latch, unused/undriven, races.
+    * `Tb`    -- testbench lint: class-based code, constraints, assertions.
+    * `Style` -- formatting and naming.
+
+    Minimal use:
+
+    ```yaml
+    - name: rtl
+      uses: std.FileSet
+      with: {type: systemVerilogSource, include: "rtl/**/*.sv"}
+
+    - name: lint
+      uses: hdllint.Rtl
+      needs: [rtl]
+      with:
+        top: [my_top]
+    ```
+
+    Tool names are the property of their respective owners.
+
+  with:
+    # Project-wide defaults, so a whole tree can be steered with one
+    # `-D hdllint.profile=strict` without editing any task. Each family task
+    # reads these as its own parameter defaults.
+    profile:
+      type: str
+      value: "default"
+    fail_on:
+      type: str
+      value: "error"
+
+  tasks:
+
+  #--------------------------------------------------------------------
+  # The families.
+  #
+  # These are not abstract: the family task IS the implementation. It
+  # resolves `tools:` against the capability registry, runs each selected
+  # backend, merges, and reports. `hdllint.<tool>.<Family>` is the same task
+  # with `tools:` pinned to one backend.
+  #--------------------------------------------------------------------
+
+  - export: Rtl
+    pytask: dv_flow.libhdllint.lint_runner.Lint
+    desc: Runs RTL design lint and produces a normalized report
+    doc: |
+      Design lint over RTL sources: width mismatches, inferred latches,
+      unused and undriven signals, blocking-assignment races, and whatever
+      else the selected tools check.
+
+      Consumes `verilogSource` / `systemVerilogSource` filesets and their
+      include directories -- point it at the same fileset the build uses.
+
+      `top:` matters more than it looks. Verilator and slang produce their
+      high-value checks only when they can elaborate, which needs a top. A
+      run with no `top:` still works, and says so as an Info marker, so a
+      thin report is never a mystery.
+
+      ```yaml
+      - name: lint
+        uses: hdllint.Rtl
+        needs: [rtl, lint-waivers]
+        with:
+          top: [wb_dma_top]
+          baseline: lint-baseline.json
+      ```
+    consumes:
+    - filetype: systemVerilogSource
+    - filetype: systemVerilogInclude
+    - filetype: verilogSource
+    - filetype: verilogInclude
+    - filetype: verilogIncDir
+    - type: hdllint.LintArgs
+    - type: hdllint.LintWaivers
+    produces:
+    - type: hdllint.Report
+    - type: std.FileSet
+      filetype: lintReport
+    with:
+      family:
+        doc: |
+          Which rule family this task runs. Set by the family task itself;
+          a flow file should not need to touch it.
+        type: str
+        value: "Rtl"
+      tools:
+        doc: |
+          Lint tools to run, by backend id (`vlt`, ...). Empty -- the
+          default -- selects every registered tool that implements this
+          family and is installed, and reports the ones that are not.
+        type: list
+      top:
+        doc: Top-level module name(s) to elaborate for checking
+        type: list
+      profile:
+        doc: |
+          Rule-set preset: `basic` (the tool's own defaults), `default`
+          (the tool's full warning set), `strict` (everything, including
+          style-adjacent checks). Profiles are convenience, not policy --
+          see docs/profiles.rst.
+        type: str
+        value: "${{ hdllint.profile:-default }}"
+      incdirs:
+        doc: Additional include directories
+        type: list
+      defines:
+        doc: Additional preprocessor defines
+        type: list
+      args:
+        doc: Additional arguments passed to every selected tool
+        type: list
+      waivers:
+        doc: |
+          Path to a waiver file, relative to the package directory. Waivers
+          can also arrive as `hdllint.LintWaivers` items through `needs:`.
+        type: str
+        value: ""
+      waiver_mode:
+        doc: |
+          How waivers are enforced.
+
+          `post` (the default) runs every check and filters the findings
+          afterwards. One matching semantics, identical across every
+          backend, and exact accounting: waived findings are counted and a
+          waiver that matches nothing is reported as stale.
+
+          `native` additionally lowers each waiver into the tool's own
+          suppression syntax where the tool can express it -- a Verilator
+          `.vlt` config, for instance. The tool then never runs the check,
+          which is what you want when a tool's own noise or runtime is the
+          problem. The cost is accounting: a natively suppressed finding is
+          never emitted, so it is not counted as waived and a stale one
+          among them cannot be detected. The run says so explicitly, and
+          the report records `waiver_mode` and `waivers_lowered`.
+
+          Lowering is always PARTIAL and the remainder is post-filtered, so
+          switching modes never silently stops a waiver from working.
+        type: str
+        value: "post"
+        values:
+        - {value: post,   desc: "filter findings after the tools run (exact accounting)"}
+        - {value: native, desc: "lower what each tool can express, post-filter the rest"}
+      baseline:
+        doc: |
+          Path to the accepted-findings baseline, relative to the package
+          directory. Findings in it are reported as baselined and do not
+          fail the gate. A missing file is an empty baseline.
+        type: str
+        value: ""
+      update_baseline:
+        doc: |
+          Rewrite the baseline from this run's findings. The run's verdict
+          then describes the new baseline, which it says explicitly.
+        type: bool
+        value: false
+        cli: {name: update-baseline}
+      fail_on:
+        doc: |
+          What makes this task fail: `none`, `error`, `warning` or `any`.
+          Only NEW findings count -- waived and baselined ones have already
+          been accepted.
+        type: str
+        value: "${{ hdllint.fail_on:-error }}"
+        values:
+        - {value: none,    desc: "never fails; report only"}
+        - {value: error,   desc: "fails on new error-severity findings"}
+        - {value: warning, desc: "fails on new warnings and errors"}
+        - {value: any,     desc: "fails on any new finding"}
+      dedup:
+        doc: |
+          Collapse the same finding reported by more than one tool. Dropped
+          duplicates are recorded in the report, so the merge is auditable.
+        type: bool
+        value: true
+      report:
+        doc: |
+          Basename for the report files: `<report>.json`, `<report>.sarif`,
+          `<report>-ctrf.json`.
+        type: str
+        value: "lint"
+      sarif:
+        doc: Emit SARIF 2.1.0 (GitHub code scanning, IDE problem lists)
+        type: bool
+        value: true
+      ctrf:
+        doc: Emit CTRF (CI test-report UIs, e.g. ctrf-io/github-test-reporter)
+        type: bool
+        value: true
+      max_markers:
+        doc: |
+          Cap on how many findings become markers. 0 (the default) is no
+          cap. When it truncates, it says by how much -- the full set is
+          always in the report file.
+        type: int
+        value: 0
+
+  - export: Tb
+    uses: hdllint.Rtl
+    desc: Runs testbench lint (class-based code, constraints, assertions)
+    doc: |
+      Testbench lint: UVM structure, constraint sanity, assertion style.
+
+      No backend implements this family yet -- Verilator parses the
+      synthesis subset and cannot see class-based code at all. Asking for
+      it therefore fails with a message naming what would implement it,
+      rather than returning an empty report. The family exists now so that
+      adding a backend is a registry row rather than a new interface.
+    with:
+      family:
+        type: str
+        value: "Tb"
+
+  - export: Style
+    uses: hdllint.Rtl
+    desc: Runs formatting and naming checks
+    doc: |
+      Style lint: line length, naming conventions, formatting. Separate
+      from `Rtl` because a formatter *verifies* rather than lints, and
+      because a project usually wants a different `fail_on` for the two.
+
+      No backend implements this family yet.
+    with:
+      family:
+        type: str
+        value: "Style"
+
+  types:
+
+  - name: LintArgs
+    doc: |
+      Extra arguments for a lint run, delivered by dataflow so one task can
+      configure lint everywhere it appears.
+
+      `tool` scopes the arguments to one backend; empty applies them to all
+      of them, which is only ever right for flags every tool understands.
+
+      ```yaml
+      - name: lint-args
+        uses: hdllint.LintArgs
+        with:
+          tool: vlt
+          args: ["-Wno-DECLFILENAME"]
+      ```
+    with:
+      tool:
+        doc: Backend id these arguments apply to; empty means all of them
+        type: str
+        value: ""
+      args:
+        doc: Arguments passed through to the tool
+        type: list
+      incdirs:
+        doc: Additional include directories
+        type: list
+      defines:
+        doc: Additional preprocessor defines
+        type: list
+
+  - name: LintWaivers
+    doc: |
+      Waivers for lint findings, as a dataflow item so one waiver task can
+      be attached to every lint task in a project.
+
+      Waivers are matched against normalized findings after the tools run;
+      they are not lowered into each tool's native waiver syntax. See
+      docs/waivers.rst for what that buys and what it costs.
+
+      Every waiver must have a `reason`. A waiver without one is a load
+      error, because the reason is the only part of it still useful once
+      the author has moved on.
+
+      ```yaml
+      - name: lint-waivers
+        uses: hdllint.LintWaivers
+        with:
+          file: lint-waivers.yaml
+      ```
+
+      or inline:
+
+      ```yaml
+      - name: lint-waivers
+        uses: hdllint.LintWaivers
+        with:
+          waivers:
+          - rule: WIDTHEXPAND
+            path: "packages/wb_dma/**"
+            reason: "Third-party DUT, not modified by this project"
+      ```
+    with:
+      file:
+        doc: Path to a YAML waiver file with a top-level `waivers:` list
+        type: str
+        value: ""
+      waivers:
+        doc: |
+          Inline waivers. Each is a mapping with `reason` (required) and any
+          of `rule`, `tool`, `path`, `line`. `rule` and `path` are globs.
+        type: list
+
+  - name: Report
+    doc: |
+      The outcome of a lint run: the verdict, the counts, and where the
+      report files are.
+
+      It carries `passed` and `status` but no field named `total`, so
+      `std.TestRunner`'s summary reads it as a single case verdict rather
+      than as a suite roll-up -- which means a lint task shows up as one row
+      in a project's test report with no extra wiring. The count of findings
+      is `findings`.
+    with:
+      passed:
+        doc: True when no new finding reached the `fail_on` threshold
+        type: bool
+        value: true
+      status:
+        doc: Either `passed` or `failed`
+        type: str
+        value: "passed"
+      findings:
+        doc: Findings after dedup, including waived and baselined ones
+        type: int
+        value: 0
+      new:
+        doc: Findings that are neither waived nor baselined
+        type: int
+        value: 0
+      waived:
+        doc: Findings suppressed by a waiver
+        type: int
+        value: 0
+      baselined:
+        doc: Findings present in the accepted baseline
+        type: int
+        value: 0
+      duplicates:
+        doc: Findings dropped as another tool's duplicate
+        type: int
+        value: 0
+      errors:
+        doc: New findings at Error severity
+        type: int
+        value: 0
+      warnings:
+        doc: New findings at Warning severity
+        type: int
+        value: 0
+      infos:
+        doc: New findings at Info severity
+        type: int
+        value: 0
+      gating:
+        doc: New findings that count against `fail_on`
+        type: int
+        value: 0
+      fail_on:
+        doc: The policy this verdict was reached under
+        type: str
+        value: ""
+      tools:
+        doc: Backend ids that ran
+        type: list
+      skipped:
+        doc: Backend ids that were skipped because the tool was not installed
+        type: list
+      report:
+        doc: Path to the normalized JSON report
+        type: str
+        value: ""
+      sarif:
+        doc: Path to the SARIF report, or empty if not emitted
+        type: str
+        value: ""
+      ctrf:
+        doc: Path to the CTRF report, or empty if not emitted
+        type: str
+        value: ""

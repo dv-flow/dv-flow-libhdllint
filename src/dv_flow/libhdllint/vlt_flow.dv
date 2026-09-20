@@ -1,0 +1,77 @@
+# yaml-language-server: $schema=https://dv-flow.github.io/flow.dv.schema.json
+#****************************************************************************
+#* vlt_flow.dv
+#*
+#* Copyright 2025 Matthew Ballance and Contributors
+#*
+#* Licensed under the Apache License, Version 2.0 (the "License"); you may
+#* not use this file except in compliance with the License.
+#* You may obtain a copy of the License at:
+#*
+#*   http://www.apache.org/licenses/LICENSE-2.0
+#*
+#* Unless required by applicable law or agreed to in writing, software
+#* distributed under the License is distributed on an "AS IS" BASIS,
+#* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#* See the License for the specific language governing permissions and
+#* limitations under the License.
+#*
+#****************************************************************************
+
+package:
+  name: hdllint.vlt
+  desc: Verilator lint integration (`verilator --lint-only`)
+  doc: |
+    Verilator as a lint tool. It is the reference backend for this library:
+    open source, already present in most flows, and fast enough to run on
+    every change.
+
+    What it sees: the synthesis subset, elaborated. That is what makes its
+    high-value checks possible -- width truncation and expansion, inferred
+    latches, unused and undriven signals, blocking-assignment ordering
+    races -- and it is also its limit. It cannot parse class-based
+    testbench code, so it implements the `Rtl` family and no other.
+
+    `verilator --lint-only -Wno-fatal` is always used. `-Wno-fatal` is not
+    a relaxation: it stops Verilator from cutting the run short once
+    warnings accumulate, so one run reports everything. Whether the run
+    fails is decided by `fail_on:` after waivers and the baseline have been
+    applied.
+
+    Verilator is the property of its respective owners.
+
+  imports:
+  - name: hdllint
+
+  tasks:
+  - export: Rtl
+    uses: hdllint.Rtl
+    desc: Runs `verilator --lint-only` and reports normalized findings
+    doc: |
+      The `hdllint.Rtl` family task with `tools:` pinned to Verilator.
+      Identical in every other respect -- same waivers, same baseline, same
+      reports.
+
+      Use this when a flow wants Verilator specifically; use `hdllint.Rtl`
+      when it wants whatever lint tools are available.
+
+      ```yaml
+      - name: lint
+        uses: hdllint.vlt.Rtl
+        needs: [rtl]
+        with:
+          top: [wb_dma_top]
+          profile: strict
+      ```
+
+      Profiles map to Verilator flags as:
+
+      | profile   | flags                  |
+      |-----------|------------------------|
+      | `basic`   | (Verilator's defaults) |
+      | `default` | `-Wall`                |
+      | `strict`  | `-Wall -Wpedantic`     |
+    with:
+      tools:
+        type: list
+        value: [vlt]

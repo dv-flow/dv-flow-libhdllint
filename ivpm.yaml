@@ -1,0 +1,47 @@
+# yaml-language-server: $schema=https://fvutils.github.io/ivpm/ivpm.schema.json
+package:
+  name: dv-flow-libhdllint
+
+  dep-sets:
+
+  - name: default-dev
+    deps:
+    - name: pytest
+      src: pypi
+    - name: dv-flow-mgr
+      url: http://github.com/dv-flow/dv-flow-mgr.git
+    - name: pydantic
+      src: pypi
+    - name: pyyaml
+      src: pypi
+    - name: toposort
+      src: pypi
+    - name: Sphinx
+      src: pypi
+    - name: sphinxcontrib-mermaid
+      src: pypi
+
+  - name: default
+    deps:
+    - name: pytest
+      src: pypi
+    - name: dv-flow-mgr
+      url: http://github.com/dv-flow/dv-flow-mgr.git
+    - name: pydantic
+      src: pypi
+    - name: pyyaml
+      src: pypi
+    - name: toposort
+      src: pypi
+    # Verilator is the reference open-source backend, and the only one the
+    # system tests can exercise out of the box. Every other backend is
+    # resolved from PATH at run time and skipped (with an Info marker) when
+    # absent -- loading the library never requires a tool to be installed.
+    - name: verilator
+      src: ivpm.yaml
+      url: https://edapack.github.io/ivpm.yaml
+      dep-set: verilator
+
+  env:
+  - name: PATH
+    path-prepend: "${IVPM_PACKAGES}/verilator/bin"

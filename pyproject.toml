@@ -1,0 +1,26 @@
+
+[build-system]
+requires = ["setuptools>=64", "setuptools-scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dv-flow-libhdllint"
+version = "0.0.1"
+dependencies = [
+    "dv-flow-mgr",
+    "pyyaml",
+]
+authors = [
+    {name = "Matthew Ballance", email = "matt.ballance@gmail.com"},
+]
+description = "Provides dv-flow tasks for running HDL lint tools and reporting their findings"
+license = {file = "LICENSE" }
+
+[project.entry-points."dv_flow.mgr"]
+libhdllint = "dv_flow.libhdllint.__ext__"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-data]
+"dv_flow.libhdllint" = ["**/*.dv", "share/**/*"]
