@@ -216,3 +216,10 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+
+# ivpm-assembled dependency tree and virtual environments
+packages/
+py/
+
+# dv-flow run directory
+rundir/

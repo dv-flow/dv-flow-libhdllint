@@ -5,28 +5,45 @@ package:
   dep-sets:
 
   - name: default-dev
+    uses: [docs]
     deps:
     - name: pytest
       src: pypi
     - name: dv-flow-mgr
-      url: http://github.com/dv-flow/dv-flow-mgr.git
+      url: https://github.com/dv-flow/dv-flow-mgr.git
     - name: pydantic
       src: pypi
     - name: pyyaml
       src: pypi
     - name: toposort
       src: pypi
-    - name: Sphinx
-      src: pypi
-    - name: sphinxcontrib-mermaid
-      src: pypi
+
+  # Everything the Sphinx build needs, and nothing else. Split out so the docs
+  # workflow can pull exactly this set without the test/tool dependencies.
+  - name: docs
+    deps:
+    - { name: sphinx, src: pypi }
+    - { name: furo, src: pypi }
+    - { name: sphinxcontrib-mermaid, src: pypi }
+    # Required, not an upgrade. `dvflow_doc_format = "markdown"` in
+    # docs/conf.py is inert unless myst_parser is a registered extension, and
+    # the symptom is `Unexpected indentation` on the first fenced code block in
+    # a `doc:` string rather than anything naming myst.
+    - { name: myst-parser, src: pypi }
+    # Generates the task reference from the flow files. Not on PyPI, so it is
+    # a source dependency here and cannot be a pyproject extra.
+    - name: sphinx-dv-flow
+      url: https://github.com/dv-flow/sphinx-dv-flow.git
+      # Sources only: its own manifest is a developer environment for THAT
+      # project, none of which this docs build needs on top of the above.
+      deps: skip
 
   - name: default
     deps:
     - name: pytest
       src: pypi
     - name: dv-flow-mgr
-      url: http://github.com/dv-flow/dv-flow-mgr.git
+      url: https://github.com/dv-flow/dv-flow-mgr.git
     - name: pydantic
       src: pypi
     - name: pyyaml

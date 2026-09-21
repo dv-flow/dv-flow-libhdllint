@@ -18,7 +18,8 @@
 #****************************************************************************
 """The normalized lint finding -- the one record every backend produces.
 
-A backend parser's entire job is to turn its tool's output into `Finding`s.
+A backend parser's entire job is to turn its tool's output into normalized
+`Finding` records.
 Everything downstream (waivers, baseline, dedup, markers, lint.json, SARIF,
 CTRF, the gate) is written against this record and knows nothing about any
 particular tool.
@@ -145,11 +146,12 @@ class Finding(object):
 
     @property
     def label(self) -> str:
-        """`tool:rule`, or just the tool when the finding has no rule id.
+        """The ``tool:rule`` pair, or just the tool when the finding has no
+        rule id.
 
         Some messages genuinely have no id -- a Verilator syntax error is
-        `%Error:` with nothing after the dash. Those are reported as
-        `[verilator]`, and are waivable by path rather than by rule.
+        ``%Error:`` with nothing after the dash. Those are reported as
+        ``[verilator]``, and are waivable by path rather than by rule.
         """
         return "%s:%s" % (self.tool_name or self.tool, self.rule) if self.rule \
             else (self.tool_name or self.tool)

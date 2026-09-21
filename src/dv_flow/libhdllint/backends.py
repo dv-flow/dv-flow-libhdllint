@@ -98,7 +98,7 @@ def _resolve(spec : str) -> Callable:
 
 # The registry. Tools not listed here do not exist as far as `tools:` is
 # concerned; adding one is a row here plus a `<tool>_lint.py` runner and a
-# `<tool>_parser.py`, and is documented in docs/contributing-a-backend.rst.
+# `<tool>_parser.py`, and is documented in docs/contributing.md.
 BACKENDS : Dict[str, Backend] = {
     "vlt": Backend(
         id="vlt",
@@ -190,6 +190,8 @@ def select(tools : List[str], family : str, env=None) -> Selection:
     `uses: hdllint.Rtl` work with no configuration at all. An explicitly named
     tool is different in kind: naming it is a statement that the run needs it,
     so a missing executable is an error rather than a skip.
+
+    ::
 
       empty list, tool implements the family, not installed -> skipped (Info)
       named tool, not installed                             -> error

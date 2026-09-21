@@ -18,5 +18,12 @@
 #****************************************************************************
 """dv-flow tasks for running HDL lint tools and reporting their findings."""
 
-VERSION = "0.0.1"
-__version__ = VERSION
+# VERSION and SUFFIX are rewritten in place by the shared release workflow
+# (dv-flow/dv-flow-release .github/workflows/dv-flow-pybuild.yml), with
+#   sed -e 's%SUFFIX=".*"%...%' -e 's%VERSION=".*"%...%'
+# so the spacing here is load-bearing: `VERSION = "..."` with spaces around the
+# `=` does not match that pattern, and sed does not fail on a pattern that
+# matches nothing. A build would then be green and stamp nothing.
+VERSION="0.0.1"
+SUFFIX=""
+__version__ = "%s%s" % (VERSION, SUFFIX)

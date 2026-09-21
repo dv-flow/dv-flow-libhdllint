@@ -36,4 +36,4 @@ def dvfm_packages():
 # family task (hdllint.Rtl) is itself the implementation: it resolves the
 # `tools:` list against the capability registry in backends.py, runs each
 # selected backend, and merges their findings into one report. See
-# docs/tools.rst.
+# docs/guide/backends.md.

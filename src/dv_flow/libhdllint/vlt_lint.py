@@ -50,7 +50,7 @@ from . import vlt_parser
 _log = logging.getLogger("hdllint.vlt")
 
 
-# Profiles. Kept thin on purpose (see docs/profiles.rst): `default` is
+# Profiles. Kept thin on purpose (see docs/guide/profiles.md): `default` is
 # Verilator's own -Wall, not a curated list, so it tracks the tool rather than
 # rotting against it. `basic` is the tool's default warning set for a first
 # run on legacy code; `strict` adds the style-adjacent checks that are off

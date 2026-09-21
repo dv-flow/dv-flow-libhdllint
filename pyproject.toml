@@ -6,8 +6,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "dv-flow-libhdllint"
 version = "0.0.1"
+requires-python = ">=3.8"
 dependencies = [
+    # Unpinned deliberately: consumers track dv-flow-mgr tip, and this library
+    # is only ever installed alongside it.
     "dv-flow-mgr",
+    # Waiver and baseline files are YAML/JSON; the YAML half needs this.
     "pyyaml",
 ]
 authors = [
@@ -15,6 +19,46 @@ authors = [
 ]
 description = "Provides dv-flow tasks for running HDL lint tools and reporting their findings"
 license = {file = "LICENSE" }
+readme = "README.md"
+keywords = ["dv-flow", "lint", "verilog", "systemverilog", "verilator", "eda", "sarif"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Electronic Design Automation (EDA)",
+    "Topic :: Software Development :: Quality Assurance",
+]
+
+[project.urls]
+Homepage = "https://dvkit.org/dv-flow/dv-flow-libhdllint/"
+Documentation = "https://dvkit.org/dv-flow/dv-flow-libhdllint/"
+Source = "https://github.com/dv-flow/dv-flow-libhdllint"
+Issues = "https://github.com/dv-flow/dv-flow-libhdllint/issues"
+
+[project.optional-dependencies]
+test = ["pytest"]
+# For someone building the docs without ivpm.
+#
+# NOT listed: sphinx-dv-flow, which is not published on PyPI and generates the
+# task reference from the flow files. A direct git reference here would be
+# rejected by PyPI for this package's own metadata, so install it separately:
+#
+#   pip install -e .[docs] git+https://github.com/dv-flow/sphinx-dv-flow.git
+#
+# `ivpm update -a -d default-dev` handles the whole set -- see docs/contributing.
+docs = [
+    "sphinx",
+    "furo",
+    "sphinxcontrib-mermaid",
+    # Required rather than optional: docs/conf.py sets
+    # `dvflow_doc_format = "markdown"`, which is inert unless myst_parser is a
+    # registered extension, and the symptom is `Unexpected indentation` on the
+    # first fenced code block in a `doc:` string rather than anything naming myst.
+    "myst-parser",
+]
 
 [project.entry-points."dv_flow.mgr"]
 libhdllint = "dv_flow.libhdllint.__ext__"

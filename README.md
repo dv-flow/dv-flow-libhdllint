@@ -1,11 +1,19 @@
 # dv-flow-libhdllint
 
-dv-flow tasks for running HDL lint tools and reporting their findings in one
-normalized form.
+[dv-flow](https://github.com/dv-flow/dv-flow-mgr) tasks for running HDL lint
+tools and reporting their findings in one normalized form.
 
-Status: **phase 0/1** -- the tool-independent core and the Verilator backend
-are implemented and tested. **Phase 1** adds five more backends: SpyGlass,
-VC Static, Questa Lint, JasperGold, and 0-in -- six backends in total.
+```shell
+pip install dv-flow-libhdllint
+```
+
+**Documentation: <https://dvkit.org/dv-flow/dv-flow-libhdllint/>**
+
+Six backends are implemented -- Verilator, SpyGlass, VC Static, Questa Lint,
+JasperGold and 0-in. No tool is a dependency of this package: every backend
+resolves its executable from `PATH` at run time, so loading the library never
+requires one to be installed. Verilator is the reference backend and the only
+one the system tests can exercise out of the box.
 
 ## What it does
 
@@ -173,6 +181,28 @@ through them.
 5. `<tool>_flow.dv` + an `__ext__.py` entry.
 6. Recorded tool output in `tests/unit/data/`, with the tool version in the
    filename.
+
+The full walk-through is in
+[the contributing guide](https://dvkit.org/dv-flow/dv-flow-libhdllint/contributing.html).
+
+## Development
+
+```shell
+pip install --upgrade --pre ivpm
+ivpm update -a -d default-dev
+./packages/python/bin/pytest tests
+make -C docs html
+```
+
+`ivpm update` assembles `packages/python` -- the dependencies, pytest, the
+documentation toolchain and Verilator from edapack. The task reference is
+generated from the flow files by
+[sphinx-dv-flow](https://github.com/dv-flow/sphinx-dv-flow), which is not on
+PyPI, so `pip install .[docs]` gets everything except that one and the ivpm
+route gets all of it.
+
+Releases are cut by tagging: `git tag v0.0.2 && git push origin v0.0.2`. A push
+to a branch never publishes.
 
 ## Trademarks
 
