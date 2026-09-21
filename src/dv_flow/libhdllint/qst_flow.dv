@@ -1,0 +1,67 @@
+# yaml-language-server: $schema=https://dv-flow.github.io/flow.dv.schema.json
+#****************************************************************************
+#* qst_flow.dv
+#*
+#* Copyright 2025 Matthew Ballance and Contributors
+#*
+#* Licensed under the Apache License, Version 2.0 (the "License"); you may
+#* not use this file except in compliance with the License.
+#* You may obtain a copy of the License at:
+#*
+#*   http://www.apache.org/licenses/LICENSE-2.0
+#*
+#* Unless required by applicable law or agreed to in writing, software
+#* distributed under the License is distributed on an "AS IS" BASIS,
+#* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#* See the License for the specific language governing permissions and
+#* limitations under the License.
+#*
+#****************************************************************************
+
+package:
+  name: hdllint.qst
+  desc: Questa Lint (AutoCheck) integration (`qverify`)
+  doc: |
+    Questa Lint as a lint tool, using AutoCheck mode. It runs
+    `qverify -c -do "autocheck compile ...; autocheck verify -timeout 0; exit"`
+    and parses the AutoCheck text report into normalized findings.
+
+    It implements the `Rtl` family and no other.
+
+    Questa Lint is the property of its respective owners.
+
+  imports:
+  - name: hdllint
+
+  tasks:
+  - export: Rtl
+    uses: hdllint.Rtl
+    desc: Runs Questa Lint AutoCheck and reports normalized findings
+    doc: |
+      The `hdllint.Rtl` family task with `tools:` pinned to Questa Lint.
+      Identical in every other respect -- same waivers, same baseline, same
+      reports.
+
+      Use this when a flow wants Questa Lint specifically; use `hdllint.Rtl`
+      when it wants whatever lint tools are available.
+
+      ```yaml
+      - name: lint
+        uses: hdllint.qst.Rtl
+        needs: [rtl]
+        with:
+          top: [my_top]
+          profile: strict
+      ```
+
+      Profiles map to qverify flags as:
+
+      | profile   | flags                    |
+      |-----------|--------------------------|
+      | `basic`   | `-autocheck_mode quick`  |
+      | `default` | (default)                |
+      | `strict`  | `-autocheck_mode deep`   |
+    with:
+      tools:
+        type: list
+        value: [qst]

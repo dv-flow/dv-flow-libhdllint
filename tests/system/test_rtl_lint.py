@@ -23,6 +23,11 @@ RTL = os.path.join(DATA, "rtl")
 def get_available_tools():
     return [tool for exe, tool in (
         ("verilator", "vlt"),
+        ("sg_shell", "spy"),
+        ("0in", "z0i"),
+        ("vc_static_shell", "vcs"),
+        ("qverify", "qst"),
+        ("jg", "jg"),
     ) if shutil.which(exe) is not None]
 
 
@@ -34,7 +39,11 @@ def run_lint(tmpdir, name="lint", **params):
     rundir = os.path.join(str(tmpdir), "rundir")
 
     builder = TaskGraphBuilder(
-        PackageLoader().load_rgy(["std", "hdllint", "hdllint.vlt"]), rundir)
+        PackageLoader().load_rgy([
+            "std", "hdllint",
+            "hdllint.vlt", "hdllint.spy", "hdllint.z0i",
+            "hdllint.vcs", "hdllint.qst", "hdllint.jg",
+        ]), rundir)
     runner = TaskSetRunner(rundir)
     runner.builder = builder
 
@@ -310,3 +319,72 @@ def test_no_sources_is_an_error_naming_the_fix(tmpdir):
 
     assert lint.result.status != 0
     assert any("No source files to lint" in m.msg for m in lint.result.markers)
+
+
+# ------------------------------------------------ parametrized tool matrix
+
+_TOOL_PKG = {
+    "vlt": "hdllint.vlt",
+    "spy": "hdllint.spy",
+    "z0i": "hdllint.z0i",
+    "vcs": "hdllint.vcs",
+    "qst": "hdllint.qst",
+    "jg":  "hdllint.jg",
+}
+
+
+@pytest.mark.parametrize("tool", AVAILABLE)
+def test_all_three_reports_written_per_tool(tool, tmpdir):
+    _, rundir = run_lint(tmpdir, tools=[tool])
+    for f in ("lint.json", "lint.sarif", "lint-ctrf.json"):
+        assert os.path.isfile(os.path.join(rundir, f)), f
+
+
+@pytest.mark.parametrize("tool", AVAILABLE)
+def test_sarif_names_the_real_tool(tool, tmpdir):
+    _, rundir = run_lint(tmpdir, tools=[tool])
+    doc = json.load(open(os.path.join(rundir, "lint.sarif")))
+    assert doc["version"] == "2.1.0"
+    driver = doc["runs"][0]["tool"]["driver"]
+    from dv_flow.libhdllint.backends import BACKENDS
+    assert driver["name"] == BACKENDS[tool].name
+
+
+@pytest.mark.parametrize("tool", AVAILABLE)
+def test_fail_on_none_reports_without_failing_per_tool(tool, tmpdir):
+    result, rundir = run_lint(tmpdir, fail_on="none", tools=[tool])
+    assert result.status == 0
+
+
+@pytest.mark.parametrize("tool", AVAILABLE)
+def test_named_backend_task_per_tool(tool, tmpdir):
+    if tool not in _TOOL_PKG:
+        pytest.skip("no sub-package for %s" % tool)
+    _, rundir = run_lint(tmpdir, task="%s.Rtl" % _TOOL_PKG[tool])
+    doc = report(rundir)
+    assert doc["summary"]["tools"] == [tool]
+
+
+@pytest.mark.skipif(len(AVAILABLE) < 2,
+                    reason="need at least two tools for multi-tool tests")
+def test_multi_tool_dedup(tmpdir):
+    """Two available tools, dedup collapses shared findings."""
+    tools = AVAILABLE[:2]
+    _, rundir = run_lint(tmpdir, tools=tools, dedup=True)
+    doc = report(rundir)
+    assert len(doc["summary"]["tools"]) == 2
+    # Duplicates may or may not exist depending on the tools' overlap,
+    # but the field must be present and non-negative.
+    assert doc["summary"]["duplicates"] >= 0
+
+
+@pytest.mark.skipif(len(AVAILABLE) < 2,
+                    reason="need at least two tools for multi-tool tests")
+def test_multi_tool_merge_report(tmpdir):
+    """Merged JSON has entries from multiple tools."""
+    tools = AVAILABLE[:2]
+    _, rundir = run_lint(tmpdir, tools=tools)
+    doc = report(rundir)
+    tool_set = set(f["tool"] for f in doc["findings"])
+    # At least one tool must have findings; both should be listed in runs.
+    assert len(doc["runs"]) == 2

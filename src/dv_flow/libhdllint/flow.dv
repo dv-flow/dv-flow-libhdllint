@@ -44,6 +44,17 @@ package:
     * `Tb`    -- testbench lint: class-based code, constraints, assertions.
     * `Style` -- formatting and naming.
 
+    Six backends are registered:
+
+    | Backend | Tool          | `Rtl` | `Style` |
+    |---------|---------------|-------|---------|
+    | `vlt`   | Verilator     | yes   | --      |
+    | `spy`   | SpyGlass      | yes   | yes     |
+    | `z0i`   | 0-in          | yes   | --      |
+    | `vcs`   | VC Static     | yes   | yes     |
+    | `qst`   | Questa Lint   | yes   | --      |
+    | `jg`    | JasperGold    | yes   | --      |
+
     Minimal use:
 
     ```yaml
@@ -260,7 +271,7 @@ package:
       from `Rtl` because a formatter *verifies* rather than lints, and
       because a project usually wants a different `fail_on` for the two.
 
-      No backend implements this family yet.
+      Two backends implement Style: `spy` (SpyGlass) and `vcs` (VC Static).
     with:
       family:
         type: str

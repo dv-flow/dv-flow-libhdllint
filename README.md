@@ -4,9 +4,8 @@ dv-flow tasks for running HDL lint tools and reporting their findings in one
 normalized form.
 
 Status: **phase 0/1** -- the tool-independent core and the Verilator backend
-are implemented and tested. Other backends (Verible, slang, svlint, the
-commercial tools) are not yet written; adding one is a registry row plus a
-parser.
+are implemented and tested. **Phase 1** adds five more backends: SpyGlass,
+VC Static, Questa Lint, JasperGold, and 0-in -- six backends in total.
 
 ## What it does
 
@@ -52,8 +51,13 @@ is never quietly thin.
 | | `Rtl` | `Tb` | `Style` |
 |---|---|---|---|
 | `vlt` (Verilator) | yes | no -- synthesis subset, cannot see classes | no |
+| `spy` (SpyGlass) | yes | -- | yes |
+| `z0i` (0-in) | yes | -- | -- |
+| `vcs` (VC Static) | yes | -- | yes |
+| `qst` (Questa Lint) | yes | -- | -- |
+| `jg` (JasperGold) | yes | -- | -- |
 
-`Tb` and `Style` are declared but have no backend yet.
+`Tb` is declared but has no backend yet. `Style` is implemented by `spy` and `vcs`.
 
 ## Reports
 

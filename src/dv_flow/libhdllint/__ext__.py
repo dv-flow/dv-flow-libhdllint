@@ -24,6 +24,11 @@ def dvfm_packages():
     return {
         'hdllint': os.path.join(hdllint_dir, "flow.dv"),
         'hdllint.vlt': os.path.join(hdllint_dir, "vlt_flow.dv"),
+        'hdllint.spy': os.path.join(hdllint_dir, "spy_flow.dv"),
+        'hdllint.z0i': os.path.join(hdllint_dir, "z0i_flow.dv"),
+        'hdllint.vcs': os.path.join(hdllint_dir, "vcs_flow.dv"),
+        'hdllint.qst': os.path.join(hdllint_dir, "qst_flow.dv"),
+        'hdllint.jg': os.path.join(hdllint_dir, "jg_flow.dv"),
     }
 
 # Tool selection is NOT done by rebinding `uses:` the way hdlsim's

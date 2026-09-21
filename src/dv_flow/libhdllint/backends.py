@@ -111,6 +111,43 @@ BACKENDS : Dict[str, Backend] = {
              "unused/undriven, blocking-order races). Synthesis subset -- it "
              "cannot see class-based testbench code, so it implements no Tb."),
 }
+BACKENDS["spy"] = Backend(
+    id="spy",
+    name="spyglass",
+    exe="sg_shell",
+    families=("Rtl", "Style"),
+    runner="dv_flow.libhdllint.spy_lint:run",
+    lowerer="dv_flow.libhdllint.spy_waivers:lower",
+    desc="SpyGlass: design lint, CDC, style.")
+BACKENDS["z0i"] = Backend(
+    id="z0i",
+    name="0-in",
+    exe="0in",
+    families=("Rtl",),
+    runner="dv_flow.libhdllint.z0i_lint:run",
+    desc="0-in: formal-based checker/assertion lint.")
+BACKENDS["vcs"] = Backend(
+    id="vcs",
+    name="vc_static",
+    exe="vc_static_shell",
+    families=("Rtl", "Style"),
+    runner="dv_flow.libhdllint.vcs_lint:run",
+    lowerer="dv_flow.libhdllint.vcs_waivers:lower",
+    desc="VC Static: RTL + style lint.")
+BACKENDS["qst"] = Backend(
+    id="qst",
+    name="questa_lint",
+    exe="qverify",
+    families=("Rtl",),
+    runner="dv_flow.libhdllint.qst_lint:run",
+    desc="Questa Lint (AutoCheck): formal-based RTL lint.")
+BACKENDS["jg"] = Backend(
+    id="jg",
+    name="jaspergold",
+    exe="jg",
+    families=("Rtl",),
+    runner="dv_flow.libhdllint.jg_lint:run",
+    desc="JasperGold superlint.")
 
 
 def which(exe : str, env=None) -> Optional[str]:

@@ -1,0 +1,89 @@
+# yaml-language-server: $schema=https://dv-flow.github.io/flow.dv.schema.json
+#****************************************************************************
+#* vcs_flow.dv
+#*
+#* Copyright 2025 Matthew Ballance and Contributors
+#*
+#* Licensed under the Apache License, Version 2.0 (the "License"); you may
+#* not use this file except in compliance with the License.
+#* You may obtain a copy of the License at:
+#*
+#*   http://www.apache.org/licenses/LICENSE-2.0
+#*
+#* Unless required by applicable law or agreed to in writing, software
+#* distributed under the License is distributed on an "AS IS" BASIS,
+#* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#* See the License for the specific language governing permissions and
+#* limitations under the License.
+#*
+#****************************************************************************
+
+package:
+  name: hdllint.vcs
+  desc: VC Static lint integration (`vc_static_shell`)
+  doc: |
+    VC Static as a lint tool.  It runs in SpyGlass-compatible mode, so the
+    report format, waiver syntax, and goal hierarchy are shared with the
+    SpyGlass backend.
+
+    What it sees: both the synthesis subset (RTL) and source-level style
+    rules.  It implements the `Rtl` and `Style` families.
+
+    `vc_static_shell` is invoked with a generated TCL script that sets the
+    goal, reads the design, runs the checks, and writes a report.
+
+    Profiles map to VC Static goals as:
+
+    | profile   | goal                 |
+    |-----------|----------------------|
+    | `basic`   | `lint_turbo_rtl`     |
+    | `default` | `lint_rtl`           |
+    | `strict`  | `lint_rtl_enhanced`  |
+
+    VC Static is the property of its respective owners.
+
+  imports:
+  - name: hdllint
+
+  tasks:
+  - export: Rtl
+    uses: hdllint.Rtl
+    desc: Runs VC Static RTL lint and reports normalized findings
+    doc: |
+      The `hdllint.Rtl` family task with `tools:` pinned to VC Static.
+      Identical in every other respect -- same waivers, same baseline, same
+      reports.
+
+      Use this when a flow wants VC Static specifically; use `hdllint.Rtl`
+      when it wants whatever lint tools are available.
+
+      ```yaml
+      - name: lint
+        uses: hdllint.vcs.Rtl
+        needs: [rtl]
+        with:
+          top: [wb_dma_top]
+          profile: strict
+      ```
+    with:
+      tools:
+        type: list
+        value: [vcs]
+
+  - export: Style
+    uses: hdllint.Style
+    desc: Runs VC Static style checks and reports normalized findings
+    doc: |
+      The `hdllint.Style` family task with `tools:` pinned to VC Static.
+
+      ```yaml
+      - name: style
+        uses: hdllint.vcs.Style
+        needs: [rtl]
+        with:
+          top: [wb_dma_top]
+      ```
+    with:
+      tools:
+        type: list
+        value: [vcs]
