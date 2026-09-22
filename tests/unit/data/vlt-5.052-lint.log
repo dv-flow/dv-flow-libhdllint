@@ -1,0 +1,34 @@
+%Warning-MULTITOP: latch_dut.v:3:8: Multiple top level modules
+                                  : ... Suggest see manual; fix the duplicates, or use --top-module to select top.
+                   ... For warning description see https://verilator.org/warn/MULTITOP?v=5.052
+                   ... Use "/* verilator lint_off MULTITOP */" and lint_on around source to disable this message.
+                                  : ... Top module 'clean'
+    2 | module clean(input clk, input [3:0] a, output reg [3:0] y);
+      |        ^~~~~
+                                  : ... Top module 'latch_dut'
+    3 | module latch_dut(input sel, input d, output reg q);
+      |        ^~~~~~~~~
+                                  : ... Top module 'width_mismatch'
+    3 | module width_mismatch(input clk, input [7:0] a, output reg [3:0] y);
+      |        ^~~~~~~~~~~~~~
+%Warning-WIDTHTRUNC: width_mismatch.v:5:9: Operator ASSIGNDLY expects 4 bits on the Assign RHS, but Assign RHS's VARREF 'a' generates 8 bits.
+                                         : ... note: In instance 'width_mismatch'
+    5 |       y <= a;
+      |         ^~
+                     ... For warning description see https://verilator.org/warn/WIDTHTRUNC?v=5.052
+                     ... Use "/* verilator lint_off WIDTHTRUNC */" and lint_on around source to disable this message.
+%Warning-UNUSEDSIGNAL: width_mismatch.v:3:46: Bits of signal are not used: 'a'[7:4]
+                                            : ... note: In instance 'width_mismatch'
+    3 | module width_mismatch(input clk, input [7:0] a, output reg [3:0] y);
+      |                                              ^
+                       ... For warning description see https://verilator.org/warn/UNUSEDSIGNAL?v=5.052
+                       ... Use "/* verilator lint_off UNUSEDSIGNAL */" and lint_on around source to disable this message.
+%Warning-LATCH: latch_dut.v:4:4: Latch inferred for signal 'q' (not all control paths of combinational always assign a value)
+                               : ... Suggest use of always_latch for intentional latches
+    4 |    always @(*) begin
+      |    ^~~~~~
+                ... For warning description see https://verilator.org/warn/LATCH?v=5.052
+                ... Use "/* verilator lint_off LATCH */" and lint_on around source to disable this message.
+- V e r i l a t i o n   R e p o r t: Verilator 5.052 2026-09-05 rev v5.052
+- Verilator: Built from 0.069 MB sources in 4 modules, into 0.021 MB in 3 C++ files needing 0.000 MB
+- Verilator: Walltime 0.004 s (elab=0.000, cvt=0.001, bld=0.000); cpu 0.004 s on 1 threads; allocated 13.887 MB

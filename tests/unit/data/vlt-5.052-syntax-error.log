@@ -1,0 +1,5 @@
+%Error: syn.v:1:21: syntax error, unexpected ';', expecting ')'
+    1 | module bad(input clk;
+      |                     ^
+        ... See the manual at https://verilator.org/verilator_doc.html?v=5.052 for more assistance.
+%Error: Exiting due to 1 error(s)

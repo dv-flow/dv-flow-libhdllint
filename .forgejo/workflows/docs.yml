@@ -136,12 +136,40 @@ jobs:
                        "incomplete: " + "; ".join(missing))
           PY
 
+      - name: Install this distribution into the docs environment
+        # THE BACKEND PAGES DO NOT RENDER WITHOUT THIS. Each backend flow file
+        # carries `imports: - name: hdllint`, and dv-flow resolves that through
+        # the `dv_flow.mgr` entry point -- which exists only once the
+        # distribution is installed. ivpm resolves DEPENDENCIES, not the
+        # project itself, so without this step the six backend packages load
+        # with `Imported package 'hdllint' not found` and their pages come out
+        # empty. It passes on a developer's machine because ivpm has usually
+        # installed this project into the surrounding venv already, which is
+        # exactly why it has to be checked here rather than trusted.
+        #
+        # --no-deps: the dependency tree is ivpm's, resolved from source
+        # checkouts. Letting pip re-resolve it would quietly replace them with
+        # PyPI releases.
+        run: |
+          ./packages/python/bin/python -m pip install -q --no-deps .
+          ./packages/python/bin/python -c "
+          import sys
+          from dv_flow.mgr.ext_rgy import ExtRgy
+          rgy = ExtRgy.inst()
+          missing = [p for p in ['hdllint', 'hdllint.vlt', 'hdllint.spy', 'hdllint.vcs',
+                                 'hdllint.qst', 'hdllint.jg', 'hdllint.z0i']
+                     if not rgy.hasPackage(p, search_path=False)]
+          if missing:
+              sys.exit('::error::the dv_flow.mgr entry point did not register: %s' % ', '.join(missing))
+          print('OK: all seven flow packages are registered')"
+
       - name: Build HTML docs
         # autodoc imports the package, so src/ has to be importable; docs/conf.py
         # puts it on sys.path so this works whether or not the distribution is
         # installed into the environment running Sphinx.
         run: |
-          make -C docs html
+          set -o pipefail
+          make -C docs html 2>&1 | tee /tmp/sphinx.log
           touch docs/_build/html/.nojekyll
 
       - name: Sanity-check the build
@@ -171,7 +199,17 @@ jobs:
           # tasks the domain actually registered.
           grep -q 'hdllint.vlt' "$html/reference/backends.html" \
             || { echo "::error::reference/backends.html does not mention hdllint.vlt; the backend packages did not load"; exit 1; }
-          echo "OK: $n pages, reference and dvf indices present"
+          # A flow package that fails to load is a WARNING by design -- a
+          # resolution failure must not fail someone else's docs build. Here it
+          # is the thing being tested, so it is promoted back to an error.
+          # Scoped to dvflow.load rather than using `-W`, so an unrelated
+          # deprecation in a new Sphinx cannot block a docs publish.
+          if grep -q 'dvflow.load' /tmp/sphinx.log; then
+            echo "::error::sphinx-dv-flow could not load a flow package:"
+            grep 'dvflow.load' /tmp/sphinx.log
+            exit 1
+          fi
+          echo "OK: $n pages, reference and dvf indices present, every flow package loaded"
 
       - name: Upload docs
         # Consumed by the host-side poller:
