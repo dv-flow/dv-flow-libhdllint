@@ -185,7 +185,12 @@ jobs:
             || { echo "::error::no index.html in the build output"; exit 1; }
           n=$(find "$html" -name '*.html' | wc -l)
           echo "generated pages: $n"
-          [ "$n" -ge 24 ] || { echo "::error::only $n pages built; a known-good build of this doc set produces 30. Refusing to call this a doc set."; exit 1; }
+          # 23 is what THIS doc set contributes. Do not raise it to match a
+          # local build: sphinx-dv-flow's viewcode adds one `_flow_source/`
+          # listing per .dv file (7 more here), so a developer with a newer
+          # checkout of it counts 30 and CI counts 23. A floor that tracks an
+          # upstream feature is a floor that goes red on an unrelated commit.
+          [ "$n" -ge 22 ] || { echo "::error::only $n pages built; this doc set produces 23. Refusing to call this a doc set."; exit 1; }
           for page in reference/hdllint.html reference/backends.html reference/api.html; do
             test -s "$html/$page" \
               || { echo "::error::$page missing or empty"; exit 1; }
