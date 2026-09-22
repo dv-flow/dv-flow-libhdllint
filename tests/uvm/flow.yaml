@@ -1,0 +1,91 @@
+# yaml-language-server: $schema=https://dv-flow.github.io/flow.dv.schema.json
+fragment:
+  name: uvm
+  # Plain RTL + UVM testbench for the OpenCores wb_dma engine.
+  #
+  # ONE DUT view (the RTL). Register access goes through the UVM RAL generated
+  # from src/rdl (`ral`), driven front-door by the fwvip-wb initiator agent over
+  # a real Wishbone bus into the DUT's WB0 slave port.
+  #
+  # The env library, the image and the runs all take their flags from the
+  # project-wide `build` variable (flow.yaml): `flags-<stage>-${{ build }}`
+  # names the holder, so `-D build=dbg` moves all three together and nothing
+  # here mentions opt or dbg.
+  tasks:
+
+  # The combinational 0-wait-state Wishbone RAMs that back the DUT's master
+  # (data) ports. A tb/ module rather than an env class, so it is compiled into
+  # the env library ahead of hdl_top (which instances it).
+  - { name: uvm-ram-src, uses: sv-module, with: {base: tb, include: [ wb_ram_slv.sv ] } }
+
+  # ---- shared UVM env library --------------------------------------------------
+  # Feed the design-package deps AND the compile-flag DataItem through the
+  # compound INPUT (not a subtask override): compound needs -> input -> pre-deps
+  # -> env-src -> ... -> env-lib, so the dep files (and incdirs) precede the env
+  # packages that import them, and the flags reach the SimLib compile. The dv.uvm
+  # package is flag-agnostic; the leaf injects the holder here.
+  - name: uvm-env
+    uses: project.dv.uvm.utils.env-base
+    needs:
+    # The generated UVM RAL (wb_dma_ral_pkg.sv), ahead of the env package that
+    # imports it. Compiling it here is also the gate that keeps codegen honest.
+    - ral
+    # The generated PSS export API (zsp_rt_pkg.sv, zsp_gen_pkg.sv), ahead of the
+    # tests package whose vseq imports it. Same slot, same reason as `ral`.
+    - pss-sv
+    - rtl
+    - org.fwvip.wb.vip-uvm-hvlsrc
+    - uvm-ram-src
+    - "flags-comp-${{ build }}"
+    # env is a single package (wb_dma_env_pkg); env-base's default *_pkg.sv glob
+    # picks it up -- no explicit env_include ordering needed.
+
+  # ---- the simulation image ----------------------------------------------------
+  # RTL only: .v -> Verilog-2001 (the RTL uses `int` as a port name, reserved in
+  # SV); --no-assert because the RTL's parallel_case/full_case pragmas trip
+  # Verilator's $stop on the all-zero t=0 state before the first clocked reset
+  # load. Both flags are load-bearing -- see the note in tb/hdl_top.sv.
+  - name: sim-img
+    uses: project.dv.uvm.utils.tb-img
+    needs:
+    - uvm-env
+    - "flags-comp-${{ build }}"
+    - "flags-elab-${{ build }}"
+    with:
+      tb_include: [hdl_top.sv, hvl_top.sv]
+      top: [hvl_top]
+      sim_args: ["+1364-2001ext+v", "--no-assert"]
+
+  # ---- the regression suite ----------------------------------------------------
+  # A suite IS all of its cases, so it is a `matrix:` -- the fan-out meaning.
+  # Each cell carries a short `name`: that is the key `dfm run tests --tests
+  # <name>` selects on. Selection prunes cells at graph build, so an unselected
+  # case is never built -- and neither is the image, if nothing else needs it.
+  #
+  # A CASE IS A SEQUENCE, not a test. `testname` is the same for every cell
+  # because a uvm_test here is a broad CATEGORY -- an env configuration and a
+  # verdict policy -- while the scenario is a virtual sequence the base test
+  # looks up by name at run time. Adding a case is adding a vseq and a cell; the
+  # test hierarchy does not grow. A second `testname` appears only when a case
+  # needs a different ENV or a different pass/fail rule.
+  #
+  # `plusargs` values carry no leading '+' (the runner adds it), the same way
+  # UVM_TESTNAME is written by hdlsim.SimRun.
+  - name: uvm-tests
+    strategy:
+      matrix:
+        case:
+        - { name: sw_copy,   vseq: wb_dma_sw_copy_vseq }
+        - { name: arb,       vseq: wb_dma_arb_vseq }
+        - { name: err,       vseq: wb_dma_err_vseq }
+        - { name: pss_hello, vseq: pss_hello_world_vseq }
+    body:
+    - name: "${{ this.case.name }}"
+      uses: hdlsim.vlt.SimUVMCase
+      needs:
+      - sim-img
+      - "flags-run-${{ build }}"
+      with:
+        name: "${{ this.case.name }}"
+        testname: wb_dma_base_test
+        plusargs: ["SEQ=${{ this.case.vseq }}"]

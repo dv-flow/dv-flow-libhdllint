@@ -1,0 +1,39 @@
+# yaml-language-server: $schema=https://dv-flow.github.io/flow.dv.schema.json
+fragment:
+  # The PSS model, and the SystemVerilog it reaches the testbench as.
+  #
+  # Same shape as src/rdl/flow.yaml -- source fileset, generator, result
+  # injected into `uvm-env`'s needs so it is compiled ahead of the bench code
+  # that imports it. The generator is different; the wiring is not.
+  #
+  # UNNAMED, like src/rdl/flow.yaml: a fragment `name:` opens a namespace, so
+  # `pss-sv` would have to be reached as `<name>.pss-sv` -- and naming it `pss`
+  # would also shadow the imported `pss` package this fragment uses.
+  tasks:
+  # `pss.FileSet`, not `std.FileSet`: it DERIVES the compile order from the tree
+  # rather than preserving a list. PSS itself does not care about file order,
+  # but a front end that resolves in file order does, and a plain glob gives
+  # alphabetical order -- which here is exactly the broken one
+  # (pss_top/actions/entry_a.pss before the pss_top.pss it extends). The
+  # component-file-plus-companion-directory layout is what makes the order
+  # derivable without analysis.
+  - name: pss-src
+    uses: pss.FileSet
+
+  # PSS -> SystemVerilog classes solved by the SV solver (pssc target
+  # `sv-native`). The defaults are the ones this project wants and are left
+  # unstated: `projection: oo_api` (the export API + factory, rather than a
+  # standalone zsp_test_top harness), `single_file: true` (one zsp_gen_pkg.sv)
+  # and `runtime: true` (also emits the bundled zsp_rt_pkg.sv). Both files come
+  # back in one systemVerilogSource fileset, runtime first -- which is the
+  # required compile order, so no consumer restates it.
+  #
+  # `export_action:` IS the export. PSS has an export-action statement
+  # (LRM 20.10: `export pss_top::entry_a();` -- no `action` keyword, parameter
+  # list mandatory), but pssc does not act on it yet, and the entry point a
+  # build exposes is a property of the build. Stated once, here.
+  - export: pss-sv
+    uses: pssc.SvNative
+    needs: [pss-src]
+    with:
+      export_action: [entry_a]

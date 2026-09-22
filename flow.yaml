@@ -1,0 +1,93 @@
+# yaml-language-server: $schema=https://dv-flow.github.io/flow.dv.schema.json
+package:
+  name: pss-registers-up
+
+  # The UVM project archetype, from dv-flow-libproject. It brings:
+  #   * the project interface -- src-rtl, src-spl, lint-rtl -- as slots
+  #     this file fills in with `override:`
+  #   * `tests` and `tests-info`
+  #   * the project-wide `--sim` and `--build` knobs, with their value sets and
+  #     per-value help, and the flags-<stage>-<variant> holders they select
+  #   * the sv-module / sv-package FileSet conveniences
+  #   * the UVM compounds (project.dv.uvm.utils.*), in scope for tests/uvm
+  #
+  # NOTE on --sim: the UVM cases in tests/uvm/flow.yaml still name
+  # `hdlsim.vlt.SimUVMCase` and pass Verilator-only `sim_args`, so today this
+  # knob moves the FLAGS but not the run task. Switching simulators for real
+  # means generalizing those two spots first.
+  uses: project.dv.uvm
+
+  # IVPM-generated map (name -> flow file, rooted at packages/) resolves the
+  # imports below by NAME, so we don't hardcode ${{ env.IVPM_PACKAGES }}/<dir>
+  # paths. Imports still list what's brought into scope (the map only resolves
+  # the names); dropping a name here removes it from `needs` scope.
+  package-map: packages/dv-flow-package-map.yaml
+
+  imports:
+  # `uses:` names the base; the import is what puts it in scope to be found.
+  - project.dv.uvm
+  - rdl                     # PeakRDL integration (dv-flow-librdl): rdl.Export
+  - pss                     # PSS source ordering (dv-flow-libpss): pss.FileSet
+  - pssc                    # PSS compiler (pssc): pssc.SvNative
+  - hdllint                 # HDL lint (dv-flow-libhdllint): hdllint.Rtl
+  - fw.proto.wb             # Wishbone transactors (signal-level xtors)
+  - org.fwvip.wb            # Wishbone UVM VIP (register-access agent + reg adapter)
+
+  tasks:
+  - override: src-rtl
+    needs:
+    - rtl
+
+  - override: tests
+    # The SUITE itself, not a gate wrapping it: `tests` IS the gate (it uses
+    # hdlsim.SimSuiteReport), and command-line selection prunes its needs at
+    # graph build. The suite lives in the `uvm` fragment namespace, so it must
+    # be qualified -- a package-root override can't reach a sub-namespace task
+    # by short name.
+    needs: [uvm.uvm-tests]
+
+  # Fills the archetype's `lint-rtl` slot. The slot only asks for a task to
+  # put in `needs:`; everything about HOW lint runs lives in `lint` below.
+  - override: lint-rtl
+    needs: [lint]
+
+  # Verilator lint over the wb_dma DUT.
+  #
+  # `tools:` is left empty deliberately, which means "every registered lint
+  # tool that is installed" -- today that is Verilator alone, and adding
+  # another one is an ivpm entry rather than an edit here. A tool that is not
+  # installed is reported as skipped, so the report is never quietly thin.
+  #
+  # BASELINE, not waivers. wb_dma is unmodified third-party Verilog: a first
+  # -Wall run over it produces far more than anyone will fix, and the choice
+  # is between accepting today's state and turning lint off. `lint-baseline.json`
+  # is that acceptance -- findings in it are reported as baselined and do not
+  # fail the run, and anything NEW does. The project's own code is what is held
+  # to zero-new. Refresh it with:
+  #
+  #   dfm run lint -D lint.update_baseline=true
+  #
+  # and the run reports how much the baseline shrank.
+  - name: lint
+    uses: hdllint.Rtl
+    needs: [src-rtl]
+    with:
+      # wb_dma_top is the DUT's top. Verilator's high-value checks (width,
+      # latch, unused/undriven) only exist once it can elaborate, which needs
+      # a top -- without one the report is parse-level and much thinner.
+      top: [wb_dma_top]
+      baseline: lint-baseline.json
+      waivers: lint-waivers.yaml
+      args:
+      # wb_dma is Verilog-2001 shipped in `.v` files, but `src/rtl/flow.yaml`
+      # declares the fileset as systemVerilogSource -- so Verilator parses it
+      # as SystemVerilog and rejects every use of `int` as an identifier, of
+      # which wb_dma_rf.v has 37. This pins the dialect by extension instead.
+      # Without it the run is 37 syntax errors and no lint at all.
+      - "+1364-2001ext+v"
+
+  fragments:
+  - src/pss/flow.yaml
+  - src/rdl/flow.yaml
+  - src/rtl/flow.yaml
+  - tests/uvm/flow.yaml

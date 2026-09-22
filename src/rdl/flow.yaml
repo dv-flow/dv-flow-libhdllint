@@ -1,0 +1,53 @@
+# yaml-language-server: $schema=https://dv-flow.github.io/flow.dv.schema.json
+fragment:
+  # The DEVICE register model, and the UVM RAL generated from it.
+  #
+  # `src/rdl/*.rdl` is the source of truth for the DMA register file: offsets,
+  # bit positions, reset values and access semantics are stated once, here, and
+  # reach the testbench as generated code. Nothing downstream restates a bit
+  # position -- the bench programs the device exclusively through the generated
+  # uvm_reg_block.
+  #
+  # BOTH files are listed, in dependency order, and `wb_dma.rdl` does NOT
+  # `include the other. peakrdl takes a file list and compiles it in order, so
+  # the include would buy nothing -- and it would cost correctness: a file
+  # reached only through the preprocessor is not an input of this task, so
+  # editing wb_dma_ch_regs.rdl would leave the export below reporting
+  # "up-to-date" and regenerating nothing. A stale register model is silent in a
+  # way a broken one is not; the RAL still compiles fine against yesterday's bit
+  # positions.
+  tasks:
+  - name: rdl-src
+    uses: std.FileSet
+    with:
+      type: systemRDLSource
+      include:
+      - wb_dma_ch_regs.rdl
+      - wb_dma.rdl
+
+  # The UVM RAL projection: a uvm_reg_block tree (wb_dma_regs, with a
+  # wb_dma_ch_regs sub-block per channel) plus a uvm_reg per register type.
+  #
+  # peakrdl-uvm derives the PACKAGE NAME from the output file name, so
+  # `wb_dma_ral_pkg.sv` yields `package wb_dma_ral_pkg`. It is a real package
+  # (--file-type package, the exporter default), so the env simply imports it.
+  #
+  # NUM_CH is a build-time RDL parameter, so the emitted `bank[]` array is
+  # STATIC. 4 is the RDL default. It must agree with the DUT's `ch_count` (and
+  # the ch0..ch3_conf "exists" bits) in tests/uvm/tb/hdl_top.sv -- the same
+  # device parameter told separately to the register model and to the RTL, with
+  # nothing checking that the two agree.
+  #
+  # type-style lexical reuses class definitions where the RDL reuses types, so
+  # the four channel banks share ONE wb_dma_ch_regs block class and one
+  # wb_dma_csr reg class, rather than four hierarchically-named copies.
+  - export: ral
+    uses: rdl.Export
+    needs: [rdl-src]
+    with:
+      format: uvm
+      top: wb_dma_regs
+      filename: wb_dma_ral_pkg.sv
+      args: ["-P", "NUM_CH=4"]
+      options:
+        type-style: lexical

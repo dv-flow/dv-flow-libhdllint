@@ -1,0 +1,10 @@
+/**
+ * pss_top -- the root component of this project's PSS model.
+ *
+ * The declaration file holds the component's SHAPE and nothing else (sub-
+ * components, attributes, register groups); everything attached to it arrives
+ * by `extend` from pss_top/. Today that is one action; Lab 2 adds the device's
+ * register groups here and its operations under pss_top/actions/.
+ */
+component pss_top {
+}

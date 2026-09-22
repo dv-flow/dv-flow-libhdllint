@@ -1,0 +1,17 @@
+/**
+ * entry_a -- the Lab 1 entry point.
+ *
+ * Which action is CALLABLE from the testbench is not stated here: the flow
+ * names it (`export_action: [entry_a]` in src/pss/flow.yaml) and the generated
+ * export API gets one task per name. The model declares behaviour; the tool
+ * invocation decides what is exported.
+ */
+extend component pss_top {
+
+    action entry_a {
+        exec body {
+            message(LOW, "Hello World!");
+        }
+    }
+
+}
