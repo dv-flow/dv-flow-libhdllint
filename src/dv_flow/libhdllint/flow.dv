@@ -44,6 +44,17 @@ package:
     * `Tb`    -- testbench lint: class-based code, constraints, assertions.
     * `Style` -- formatting and naming.
 
+    Six backends are registered:
+
+    | Backend | Tool          | `Rtl` | `Style` |
+    |---------|---------------|-------|---------|
+    | `vlt`   | Verilator     | yes   | --      |
+    | `spy`   | SpyGlass      | yes   | yes     |
+    | `z0i`   | 0-in          | yes   | --      |
+    | `vcs`   | VC Static     | yes   | yes     |
+    | `qst`   | Questa Lint   | yes   | --      |
+    | `jg`    | JasperGold    | yes   | --      |
+
     Minimal use:
 
     ```yaml
@@ -139,7 +150,7 @@ package:
           Rule-set preset: `basic` (the tool's own defaults), `default`
           (the tool's full warning set), `strict` (everything, including
           style-adjacent checks). Profiles are convenience, not policy --
-          see docs/profiles.rst.
+          see docs/guide/profiles.md.
         type: str
         value: "${{ hdllint.profile:-default }}"
       incdirs:
@@ -260,7 +271,7 @@ package:
       from `Rtl` because a formatter *verifies* rather than lints, and
       because a project usually wants a different `fail_on` for the two.
 
-      No backend implements this family yet.
+      Two backends implement Style: `spy` (SpyGlass) and `vcs` (VC Static).
     with:
       family:
         type: str
@@ -305,7 +316,7 @@ package:
 
       Waivers are matched against normalized findings after the tools run;
       they are not lowered into each tool's native waiver syntax. See
-      docs/waivers.rst for what that buys and what it costs.
+      docs/guide/waivers.md for what that buys and what it costs.
 
       Every waiver must have a `reason`. A waiver without one is a load
       error, because the reason is the only part of it still useful once

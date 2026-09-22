@@ -1,0 +1,90 @@
+# yaml-language-server: $schema=https://dv-flow.github.io/flow.dv.schema.json
+#****************************************************************************
+#* spy_flow.dv
+#*
+#* Copyright 2025 Matthew Ballance and Contributors
+#*
+#* Licensed under the Apache License, Version 2.0 (the "License"); you may
+#* not use this file except in compliance with the License.
+#* You may obtain a copy of the License at:
+#*
+#*   http://www.apache.org/licenses/LICENSE-2.0
+#*
+#* Unless required by applicable law or agreed to in writing, software
+#* distributed under the License is distributed on an "AS IS" BASIS,
+#* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#* See the License for the specific language governing permissions and
+#* limitations under the License.
+#*
+#****************************************************************************
+
+package:
+  name: hdllint.spy
+  desc: SpyGlass lint integration (`sg_shell`)
+  doc: |
+    SpyGlass as a lint tool. It provides deep design-rule checking across
+    RTL and style families, including CDC, RDC, and methodology rules.
+
+    What it sees: full RTL elaboration plus style/coding rules. SpyGlass
+    goals range from lightweight turbo checks to full enhanced lint, so it
+    implements both the `Rtl` and `Style` families.
+
+    The backend generates a TCL script that creates a SpyGlass project,
+    reads the source, runs the selected goal, and exports a text report.
+    The `sg_shell -tcl_file` invocation is always used.
+
+    Profiles map to SpyGlass goals as:
+
+    | profile   | goal                     |
+    |-----------|--------------------------|
+    | `basic`   | `lint/lint_turbo_rtl`    |
+    | `default` | `lint/lint_rtl`          |
+    | `strict`  | `lint/lint_rtl_enhanced` |
+
+    SpyGlass is the property of its respective owners.
+
+  imports:
+  - name: hdllint
+
+  tasks:
+  - export: Rtl
+    uses: hdllint.Rtl
+    desc: Runs SpyGlass RTL lint and reports normalized findings
+    doc: |
+      The `hdllint.Rtl` family task with `tools:` pinned to SpyGlass.
+      Identical in every other respect -- same waivers, same baseline, same
+      reports.
+
+      Use this when a flow wants SpyGlass specifically; use `hdllint.Rtl`
+      when it wants whatever lint tools are available.
+
+      ```yaml
+      - name: lint
+        uses: hdllint.spy.Rtl
+        needs: [rtl]
+        with:
+          top: [my_top]
+          profile: strict
+      ```
+    with:
+      tools:
+        type: list
+        value: [spy]
+
+  - export: Style
+    uses: hdllint.Style
+    desc: Runs SpyGlass style lint and reports normalized findings
+    doc: |
+      The `hdllint.Style` family task with `tools:` pinned to SpyGlass.
+
+      ```yaml
+      - name: style
+        uses: hdllint.spy.Style
+        needs: [rtl]
+        with:
+          top: [my_top]
+      ```
+    with:
+      tools:
+        type: list
+        value: [spy]

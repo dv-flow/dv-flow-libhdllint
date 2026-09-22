@@ -70,6 +70,11 @@ _TOOL_URI = {
     "slang": "https://sv-lang.com",
     "svlint": "https://github.com/dalance/svlint",
 }
+_TOOL_URI["spy"] = "https://www.synopsys.com/verification/static-and-formal-verification/spyglass.html"
+_TOOL_URI["z0i"] = "https://www.synopsys.com/verification/static-and-formal-verification.html"
+_TOOL_URI["vcs"] = "https://www.synopsys.com/verification/static-and-formal-verification.html"
+_TOOL_URI["qst"] = "https://eda.sw.siemens.com/en-US/ic/questa/formal-verification/"
+_TOOL_URI["jg"] = "https://www.cadence.com/en_US/home/tools/system-design-and-verification/formal-and-static-verification/jasper-gold-verification-platform.html"
 
 
 @dc.dataclass

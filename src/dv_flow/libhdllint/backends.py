@@ -98,7 +98,7 @@ def _resolve(spec : str) -> Callable:
 
 # The registry. Tools not listed here do not exist as far as `tools:` is
 # concerned; adding one is a row here plus a `<tool>_lint.py` runner and a
-# `<tool>_parser.py`, and is documented in docs/contributing-a-backend.rst.
+# `<tool>_parser.py`, and is documented in docs/contributing.md.
 BACKENDS : Dict[str, Backend] = {
     "vlt": Backend(
         id="vlt",
@@ -111,6 +111,43 @@ BACKENDS : Dict[str, Backend] = {
              "unused/undriven, blocking-order races). Synthesis subset -- it "
              "cannot see class-based testbench code, so it implements no Tb."),
 }
+BACKENDS["spy"] = Backend(
+    id="spy",
+    name="spyglass",
+    exe="sg_shell",
+    families=("Rtl", "Style"),
+    runner="dv_flow.libhdllint.spy_lint:run",
+    lowerer="dv_flow.libhdllint.spy_waivers:lower",
+    desc="SpyGlass: design lint, CDC, style.")
+BACKENDS["z0i"] = Backend(
+    id="z0i",
+    name="0-in",
+    exe="0in",
+    families=("Rtl",),
+    runner="dv_flow.libhdllint.z0i_lint:run",
+    desc="0-in: formal-based checker/assertion lint.")
+BACKENDS["vcs"] = Backend(
+    id="vcs",
+    name="vc_static",
+    exe="vc_static_shell",
+    families=("Rtl", "Style"),
+    runner="dv_flow.libhdllint.vcs_lint:run",
+    lowerer="dv_flow.libhdllint.vcs_waivers:lower",
+    desc="VC Static: RTL + style lint.")
+BACKENDS["qst"] = Backend(
+    id="qst",
+    name="questa_lint",
+    exe="qverify",
+    families=("Rtl",),
+    runner="dv_flow.libhdllint.qst_lint:run",
+    desc="Questa Lint (AutoCheck): formal-based RTL lint.")
+BACKENDS["jg"] = Backend(
+    id="jg",
+    name="jaspergold",
+    exe="jg",
+    families=("Rtl",),
+    runner="dv_flow.libhdllint.jg_lint:run",
+    desc="JasperGold superlint.")
 
 
 def which(exe : str, env=None) -> Optional[str]:
@@ -153,6 +190,8 @@ def select(tools : List[str], family : str, env=None) -> Selection:
     `uses: hdllint.Rtl` work with no configuration at all. An explicitly named
     tool is different in kind: naming it is a statement that the run needs it,
     so a missing executable is an error rather than a skip.
+
+    ::
 
       empty list, tool implements the family, not installed -> skipped (Info)
       named tool, not installed                             -> error

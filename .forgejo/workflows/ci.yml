@@ -1,0 +1,162 @@
+# dv-flow/dv-flow-libhdllint -- Forgejo Actions.
+#
+# THIS FILE'S FIRST JOB IS TO EXIST. When .forgejo/workflows/ is absent the
+# Forgejo runner falls back to running .github/workflows/ -- measured on this
+# instance, not assumed. That file calls
+#   dv-flow/dv-flow-release/.github/workflows/dv-flow-pybuild.yml@main
+# which is a GitHub reusable workflow: a bare `uses:` here resolves against
+# code.forgejo.org, not github.com, so the fallback could only ever have failed
+# on its first step. Existing is what stops it trying.
+#
+# WHY THIS IS A CHECK AND NOT A MIRROR OF THE BUILD. The real build fetches
+# dependencies with `ivpm update -a`, which clones sibling repositories over the
+# network. Reproducing that here would make every push depend on github.com
+# being reachable, to test nothing this repo controls.
+#
+# What it checks instead is THE CONTRACT WITH THE SHARED WORKFLOW, which is
+# otherwise unchecked anywhere and fails silently when broken. That workflow
+# stamps the build version with:
+#
+#   sed -i -e 's%SUFFIX=".*"%SUFFIX="${suffix}"%g' \
+#          -e 's%VERSION=".*"%VERSION="${version}"%g' <version_dir>/__init__.py
+#   sed -i -e 's%version.*=.*".*"%version = "${version}${suffix}"%g' pyproject.toml
+#
+# `sed` does not fail when its pattern matches nothing. So a version_dir that
+# has moved, or an __init__.py that no longer carries VERSION/SUFFIX in exactly
+# that spacing, produces a green build that stamped nothing -- and the mismatch
+# surfaces as a package whose metadata version and runtime __version__ disagree.
+#
+# THERE IS DELIBERATELY NO PUBLISH JOB. Releases for this repo run on GitHub
+# through the shared workflow, the release-authority switch resolves to `github`
+# for it, and PYPI_API_TOKEN is a GitHub org secret. All three agree, which is
+# what matters: a policy that claims one forge while only the other can publish
+# is the failure mode this arrangement exists to avoid.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Check for internal identifiers in tracked files
+      # This repo is published to git.dvkit.org, so anything committed here is
+      # public. Internal host names, tailnet addresses and CGNAT-range IPs must
+      # not appear in tracked files -- if a build ever needs one, it belongs in
+      # a repository secret, which is masked in logs. This applies to
+      # documentation and comments as much as to code.
+      run: |
+        pattern='perch-char\.ts\.net|\.ts\.net|a9550|100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.[0-9]+\.[0-9]+'
+        if git grep -nIE "$pattern" -- . ':!.forgejo/workflows/' ; then
+          echo "::error::internal identifier found in a tracked file (see matches above)"
+          exit 1
+        fi
+        echo "OK: no internal identifiers in tracked files"
+
+    - name: The shared workflow reference must still resolve
+      # The caller pins a BRANCH, not a SHA, so this is not a version check --
+      # it is a check that the path has not been edited to something that will
+      # 404 at run time. GitHub reports a missing reusable workflow per caller,
+      # at the moment of the run, and never in the repo that moved it.
+      run: |
+        want='dv-flow/dv-flow-release/.github/workflows/dv-flow-pybuild.yml@main'
+        if ! grep -qF "$want" .github/workflows/ci.yml; then
+          echo "::error::.github/workflows/ci.yml no longer references $want"
+          echo "If that is deliberate, this check and the repo's release path both need updating."
+          exit 1
+        fi
+        echo "OK: calls $want"
+
+    - name: The version stamp the shared workflow applies must have something to bite on
+      run: |
+        vd='src/dv_flow/libhdllint'
+        rc=0
+
+        if [ ! -d "$vd" ]; then
+          echo "::error::version_dir '$vd' does not exist; the shared workflow stamps into it"
+          exit 1
+        fi
+        echo "OK: version_dir $vd exists"
+
+        # pyproject.toml, read with the SAME pipeline the shared workflow uses.
+        # Matching its extraction rather than writing a better one is the point:
+        # what matters is what that sed will see.
+        version=$(grep -w version pyproject.toml | sed -e 's%^.*=.*"\([^"][^"]*\)".*$%\1%' | head -1)
+        if ! printf '%s' "$version" | grep -qE '^[0-9]+\.[0-9]+'; then
+          echo "::error::cannot read a version from pyproject.toml (got '$version')"
+          rc=1
+        else
+          echo "OK: pyproject.toml declares $version"
+        fi
+
+        # The shared workflow's extraction has no `head -1`: a second line
+        # matching `-w version` would feed it two versions and stamp garbage.
+        nv=$(grep -cw version pyproject.toml)
+        if [ "$nv" -ne 1 ]; then
+          echo "::error::pyproject.toml has $nv lines matching \`grep -w version\`; the shared workflow expects exactly one"
+          rc=1
+        fi
+
+        # __init__.py. The spacing is load-bearing: the sed above matches
+        # VERSION="..." with no spaces around the `=`, and sed does not fail on
+        # a pattern that matches nothing.
+        init="$vd/__init__.py"
+        if [ ! -f "$init" ]; then
+          echo "::error::$init does not exist; the shared workflow's VERSION/SUFFIX stamp is a no-op"
+          rc=1
+        elif ! grep -qE '^VERSION="' "$init" || ! grep -qE '^SUFFIX="' "$init"; then
+          echo "::error::$init has no top-level VERSION=\"...\" and SUFFIX=\"...\" pair;"
+          echo "::error::the shared workflow seds for exactly that shape and sed does not fail on no match,"
+          echo "::error::so __version__ would not reflect the build while pyproject.toml would."
+          rc=1
+        else
+          echo "OK: $init carries the VERSION/SUFFIX pair the stamp rewrites"
+        fi
+
+        # A tag IS the version. Catching a disagreement here is the whole point
+        # of doing it on the tag ref: it cannot be fixed after a publish.
+        case "${GITHUB_REF:-}" in
+          refs/tags/v*)
+            tag="${GITHUB_REF#refs/tags/v}"
+            if [ "$tag" != "$version" ]; then
+              echo "::error::tag v$tag does not match pyproject.toml version $version"
+              rc=1
+            else
+              echo "OK: tag v$tag matches the declared version"
+            fi
+            iv=$(sed -n 's%^VERSION="\(.*\)"%\1%p' "$init" | head -1)
+            if [ "$iv" != "$version" ]; then
+              echo "::error::$init declares VERSION=\"$iv\" but pyproject.toml declares $version"
+              rc=1
+            fi ;;
+        esac
+
+        exit $rc
+
+    - name: The flow packages the entry point advertises must all exist
+      # Every `*_flow.dv` is listed in __ext__.py and shipped as package data.
+      # A file renamed on one side and not the other installs cleanly and fails
+      # at `dfm run` in someone else's project, which is the worst place to
+      # find out. Checked with the stdlib so this job needs nothing installed.
+      run: |
+        python3 - <<'PY'
+        import os, re, sys
+        src = "src/dv_flow/libhdllint"
+        ext = open(os.path.join(src, "__ext__.py")).read()
+        named = re.findall(r'"(\w+_flow\.dv|flow\.dv)"', ext)
+        missing = [f for f in named if not os.path.isfile(os.path.join(src, f))]
+        if missing:
+            sys.exit("::error::__ext__.py names flow files that do not exist: %s" % ", ".join(missing))
+        on_disk = {f for f in os.listdir(src) if f.endswith("_flow.dv") or f == "flow.dv"}
+        unlisted = sorted(on_disk - set(named))
+        if unlisted:
+            sys.exit("::error::flow files present but not registered in __ext__.py: %s" % ", ".join(unlisted))
+        print("OK: %d flow packages, all registered and present" % len(named))
+        PY

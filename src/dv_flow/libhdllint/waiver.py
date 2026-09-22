@@ -25,7 +25,7 @@ backend, including commercial ones that cannot be run in CI.
 There are two enforcement paths, selected by `waiver_mode:`:
 
 * **post-filter** (the default) -- every tool runs every check, and waivers
-  are matched against the normalized `Finding`s afterwards. One matching
+  are matched against the normalized `Finding` records afterwards. One matching
   semantics to learn and to test, uniform across backends, and exact
   accounting: waived findings are counted, and a waiver that matches nothing
   is reported as stale. What it costs is that the tool still spends the time,
