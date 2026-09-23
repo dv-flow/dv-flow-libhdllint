@@ -217,11 +217,15 @@ __marimo__/
 .streamlit/secrets.toml
 
 
-.agents/
-.claude/
-.codex/
-.cursor/
-
+# ivpm-assembled dependency tree and virtual environments
 packages/
+py/
+
+# dv-flow run directory
 rundir/
 
+# Recorded tool output, which is test DATA rather than a log. The `*.log` rule
+# above swallowed it: the fixtures were present on every developer's machine
+# and absent from the repository, so tests/unit/test_vlt_parser.py passed
+# locally and failed on the first CI run that ever checked out this tree.
+!tests/unit/data/*.log
